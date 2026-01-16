@@ -221,6 +221,7 @@ print(response.choices[0].message.content)
             - **修复内容**: 
                 - **响应收集器**：在 `collector.rs` 中添加了 `signature` 字段的提取和持久化逻辑，并补充了单元测试 `test_collect_thinking_response_with_signature`。
                 - **请求转换器**：在 `request.rs` 中实施严格签名验证，只使用已缓存且兼容的签名。未知或不兼容的签名会导致 thinking 块自动降级为普通文本，避免发送无效签名。
+                - **回退机制**：实现智能回退重试逻辑。如果签名验证失效或上游 API 拒绝（400错误），系统会自动清除所有 thinking 块并强制重试，确保用户请求总是成功。
             - **影响范围**: 彻底解决了 `Invalid signature in thinking block` 错误，支持跨模型切换和冷启动场景，确保 Thinking 模型在所有模式下稳定工作。
     *   **v3.3.34 (2026-01-16)**:
         - **OpenAI Codex/Responses 协议修复 (Fix Issue #742)**:
