@@ -140,6 +140,23 @@ curl -fsSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/dep
 > **注意**: 该方案通过 Xvfb 模拟图形环境，资源占用（内存/CPU）会高于纯后端应用。
 > **详情见**: [服务器部署指南 (deploy/headless-xvfb)](./deploy/headless-xvfb/README.md)
 
+### 选项 D: Docker 部署 (推荐用于 NAS/服务器)
+如果您希望在容器化环境中运行，我们提供了完整的 Docker 镜像和配置，内置 noVNC 支持，可通过浏览器直接访问图形界面。
+
+```bash
+# 1. 进入部署目录
+cd deploy/docker
+
+# 2. 启动服务
+docker compose up -d
+```
+> **访问地址**: `http://localhost:6080/vnc_lite.html` (默认 VNC 密码: `password`)
+> **系统要求**:
+> - **内存**: 建议 **2GB** (最小 512MB)。
+> - **共享内存**: 需设置 `shm_size: 2gb` (已在 compose 中配置)，防止浏览器崩溃。
+> - **架构**: 支持 x86_64 和 ARM64。
+> **详情见**: [Docker 部署指南 (deploy/docker)](./deploy/docker/README.md)
+
 ---
 
 Copyright © 2024-2026 [lbjlaq](https://github.com/lbjlaq)

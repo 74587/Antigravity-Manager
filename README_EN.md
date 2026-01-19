@@ -141,6 +141,23 @@ curl -fsSL https://raw.githubusercontent.com/lbjlaq/Antigravity-Manager/main/dep
 > **Note**: This solution uses Xvfb to simulate a GUI environment. Resource consumption (RAM/CPU) will be higher than a native backend service.
 > **See**: [Server Deployment Guide (deploy/headless-xvfb)](./deploy/headless-xvfb/README.md)
 
+### Option D: Docker Deployment (Recommended for NAS/Servers)
+If you prefer running in a containerized environment, we provide a full Docker image and configuration with built-in noVNC support for direct browser-based GUI access.
+
+```bash
+# 1. Enter the deployment directory
+cd deploy/docker
+
+# 2. Start the service
+docker compose up -d
+```
+> **Access URL**: `http://localhost:6080/vnc_lite.html` (Default VNC password: `password`)
+> **System Requirements**:
+> - **RAM**: **2GB** recommended (minimum 512MB).
+> - **Shared Memory**: Requires `shm_size: 2gb` (pre-configured in compose) to prevent browser crashes.
+> - **Architecture**: Supports x86_64 and ARM64.
+> **See**: [Docker Deployment Guide (deploy/docker)](./deploy/docker/README.md)
+
 ### 🛠️ Troubleshooting
 
 #### macOS says "App is damaged"?
