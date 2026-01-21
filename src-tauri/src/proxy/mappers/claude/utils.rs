@@ -32,7 +32,10 @@ pub fn to_claude_usage(usage_metadata: &super::models::UsageMetadata, scaling_en
     // - 85%+:   接近 1:1 显示，确保触发 Claude Code 的 compact 提示
     let total_raw = prompt_tokens;
 
-    let scaled_total = if scaling_enabled && total_raw > 0 {
+    // [FIX] Restore low token threshold - don't scale if under 30k tokens
+    const SCALING_THRESHOLD: u32 = 30_000;
+
+    let scaled_total = if scaling_enabled && total_raw > SCALING_THRESHOLD {
         const TARGET_MAX: f64 = 195_000.0; // 接近 Claude 的 200k 限制
 
         let ratio = total_raw as f64 / context_limit as f64;

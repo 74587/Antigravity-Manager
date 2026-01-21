@@ -519,6 +519,7 @@ pub async fn handle_messages(
         // 对 Pro/Flash 模型进行差异化的上下文管理
         // [FIX] 使用校准器提高估算准确度，降低阈值防止漏判
         let mut is_purified = false;
+
         if !retried_without_thinking {
             // 1. 确定上下文限制 (Flash: ~1M, Pro: ~2M)
             // Use conservative limits to account for API overhead
@@ -529,18 +530,18 @@ pub async fn handle_messages(
             };
 
             // 2. 估算当前用量 (使用校准器提高准确度)
-            let raw_estimated = ContextManager::estimate_token_usage(&request_with_mapped);
+            let raw_estimated_for_decision = ContextManager::estimate_token_usage(&request_with_mapped);
             let calibrator = get_calibrator();
-            let estimated_usage = calibrator.calibrate(raw_estimated);
+            let estimated_usage = calibrator.calibrate(raw_estimated_for_decision);
             let usage_ratio = estimated_usage as f32 / context_limit as f32;
 
-            // 3. 确定清洗策略 (使用更低的阈值防止漏判)
-            // > 70%: 激进剥离 (Aggressive) - 移除所有历史 Thinking
-            // > 40%: 柔性剥离 (Soft) - 仅保留最近 2 轮 Thinking
-            // < 40%: 不处理
-            let strategy = if usage_ratio > 0.7 {
+            // 3. 确定清洗策略 (使用更保守的阈值)
+            // > 75%: 激进剥离 (Aggressive) - 移除所有历史 Thinking
+            // > 50%: 柔性剥离 (Soft) - 仅保留最近 2 轮 Thinking
+            // < 50%: 不处理
+            let strategy = if usage_ratio > 0.75 {
                 PurificationStrategy::Aggressive
-            } else if usage_ratio > 0.4 {
+            } else if usage_ratio > 0.5 {
                 PurificationStrategy::Soft
             } else {
                 PurificationStrategy::None
@@ -550,7 +551,7 @@ pub async fn handle_messages(
             if strategy != PurificationStrategy::None {
                 info!(
                     "[{}] [ContextManager] Context pressure: {:.1}% (raw: {}, calibrated: {} / {}), Calibration factor: {:.2}, Strategy: {:?}",
-                    trace_id, usage_ratio * 100.0, raw_estimated, estimated_usage, context_limit, calibrator.get_factor(), strategy
+                    trace_id, usage_ratio * 100.0, raw_estimated_for_decision, estimated_usage, context_limit, calibrator.get_factor(), strategy
                 );
 
                 if ContextManager::purify_history(&mut request_with_mapped.messages, strategy) {
@@ -559,6 +560,14 @@ pub async fn handle_messages(
                 }
             }
         }
+
+        // [FIX] Estimate AFTER purification to get accurate token count for calibrator learning
+        // Only estimate for calibrator when content was not purified, to avoid skewed learning
+        let raw_estimated = if !is_purified {
+            ContextManager::estimate_token_usage(&request_with_mapped)
+        } else {
+            0 // Don't record calibration data when content was purified
+        };
 
         request_with_mapped.model = mapped_model;
 
@@ -635,12 +644,13 @@ pub async fn handle_messages(
                 // We must pre-read until we find a MEANINGFUL content block (like message_start).
                 // If we only get heartbeats (ping) and then the stream dies, we should rotate account.
                 let mut claude_stream = create_claude_sse_stream(
-                    gemini_stream, 
-                    trace_id.clone(), 
+                    gemini_stream,
+                    trace_id.clone(),
                     email.clone(),
                     Some(session_id_str.clone()),
                     scaling_enabled,
-                    context_limit
+                    context_limit,
+                    Some(raw_estimated) // [FIX] Pass estimated tokens for calibrator learning
                 );
 
                 let mut first_data_chunk = None;

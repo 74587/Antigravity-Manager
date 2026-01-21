@@ -232,6 +232,8 @@ pub struct StreamingState {
     // [NEW] MCP XML Bridge 缓冲区
     pub mcp_xml_buffer: String,
     pub in_mcp_xml: bool,
+    // [FIX] Estimated prompt tokens for calibrator learning
+    pub estimated_prompt_tokens: Option<u32>,
 }
 
 impl StreamingState {
@@ -255,6 +257,7 @@ impl StreamingState {
             context_limit: 1_048_576, // Default to 1M
             mcp_xml_buffer: String::new(),
             in_mcp_xml: false,
+            estimated_prompt_tokens: None,
         }
     }
 
@@ -461,10 +464,16 @@ impl StreamingState {
 
         let usage = usage_metadata
             .map(|u| {
-                // Record actual token usage for calibrator learning
-                if let Some(actual_tokens) = u.prompt_token_count {
-                    get_calibrator().record(0, actual_tokens); // Will be paired with estimate from request
-                    tracing::debug!("[Calibrator] Recorded actual prompt tokens: {}", actual_tokens);
+                // [FIX] Record actual token usage for calibrator learning
+                // Now properly pairs estimated tokens from request with actual tokens from response
+                if let (Some(estimated), Some(actual)) = (self.estimated_prompt_tokens, u.prompt_token_count) {
+                    if estimated > 0 && actual > 0 {
+                        get_calibrator().record(estimated, actual);
+                        tracing::debug!(
+                            "[Calibrator] Recorded: estimated={}, actual={}, ratio={:.2}x",
+                            estimated, actual, actual as f64 / estimated as f64
+                        );
+                    }
                 }
                 to_claude_usage(u, self.scaling_enabled, self.context_limit)
             })
